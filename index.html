@@ -2,8 +2,23 @@
 <html lang="zh-HK">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>搵樓 CP 值計算機 (Pro版)</title>
+    
+    <!-- === PWA / Mobile Web App 設定 (新增部分) === -->
+    <!-- 1. 設定加入主畫面後的 App 名稱 -->
+    <meta name="apple-mobile-web-app-title" content="搵樓Pro">
+    <!-- 2. 允許全螢幕模式 (隱藏瀏覽器網址列) -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <!-- 3. 設定狀態列顏色 -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#059669">
+    
+    <!-- 4. 設定 App Icon (自動生成綠底白屋圖示，無需上傳) -->
+    <link rel="apple-touch-icon" href="https://placehold.co/180x180/059669/ffffff.png?text=🏠&font=roboto">
+    <link rel="icon" type="image/png" href="https://placehold.co/180x180/059669/ffffff.png?text=🏠&font=roboto">
+    <!-- =========================================== -->
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Vue.js 3 -->
@@ -21,14 +36,17 @@
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .slide-enter-active, .slide-leave-active { transition: all 0.3s ease; }
         .slide-enter-from, .slide-leave-to { opacity: 0; transform: translateY(20px); }
+        /* 修正 iOS 全螢幕時的安全區域 */
+        header { padding-top: env(safe-area-inset-top); }
+        #app { padding-bottom: env(safe-area-inset-bottom); }
     </style>
 </head>
-<body class="text-gray-800">
+<body class="text-gray-800 bg-gray-100">
 
 <div id="app" class="max-w-md mx-auto min-h-screen bg-gray-50 shadow-2xl relative pb-24">
     
     <!-- 頂部導航欄 -->
-    <header :class="isOnline ? 'bg-emerald-600' : 'bg-slate-700'" class="text-white p-6 rounded-b-3xl shadow-lg sticky top-0 z-50 transition-colors duration-500">
+    <header :class="isOnline ? 'bg-emerald-600' : 'bg-slate-700'" class="text-white p-6 pb-6 pt-12 rounded-b-3xl shadow-lg sticky top-0 z-50 transition-colors duration-500">
         <div class="flex justify-between items-center">
             <div>
                 <h1 class="text-2xl font-bold tracking-wide">
@@ -101,14 +119,30 @@
                         class="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
 
-                <!-- 相片 -->
+                <!-- 選擇 Icon 或 上傳相片 -->
                 <div>
-                    <label class="block text-xs font-medium text-gray-500 mb-1">現場相片</label>
+                    <label class="block text-xs font-medium text-gray-500 mb-2">圖示 或 相片</label>
+                    
+                    <!-- Icon 選擇器 -->
+                    <div class="grid grid-cols-6 gap-2 mb-3">
+                        <button type="button" v-for="icon in iconOptions" :key="icon.class" 
+                            @click="form.icon = icon.class; form.image = null"
+                            class="aspect-square rounded-lg flex items-center justify-center border transition-all"
+                            :class="form.icon === icon.class && !form.image ? 'bg-emerald-100 border-emerald-500 text-emerald-600' : 'bg-gray-50 border-gray-200 text-gray-400 hover:bg-gray-100'">
+                            <i :class="['fas', icon.class, 'text-lg']"></i>
+                        </button>
+                    </div>
+
+                    <!-- 相片上傳按鈕 -->
                     <div class="relative">
                         <input type="file" @change="handleImageUpload" accept="image/*" class="hidden" id="fileInput">
                         <label for="fileInput" class="flex items-center justify-center w-full h-10 bg-gray-100 rounded-xl cursor-pointer border border-dashed border-gray-300 hover:bg-gray-200 transition">
-                            <span v-if="!form.image" class="text-gray-400 text-xs"><i class="fas fa-camera mr-2"></i>拍照 / 上傳</span>
-                            <span v-else class="text-emerald-600 text-xs"><i class="fas fa-check mr-2"></i>已選取</span>
+                            <span v-if="!form.image" class="text-gray-400 text-xs">
+                                <i class="fas fa-camera mr-2"></i>亦可上傳現場相片
+                            </span>
+                            <span v-else class="text-emerald-600 text-xs font-bold">
+                                <i class="fas fa-check mr-2"></i>已選取相片 (將覆蓋圖示)
+                            </span>
                         </label>
                     </div>
                 </div>
@@ -172,6 +206,13 @@
                     </div>
                 </div>
 
+                <!-- 備註 / 評論 (新增功能) -->
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">備註 / 評論</label>
+                    <textarea v-model="form.comment" placeholder="例如：近地鐵但有噪音、業主急放、向南..." 
+                        class="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 h-20 text-sm resize-none"></textarea>
+                </div>
+
                 <button type="submit" :disabled="isUploading"
                     class="w-full text-white bg-slate-800 hover:bg-slate-900 font-medium rounded-xl text-sm px-5 py-3.5 shadow-lg shadow-slate-500/30 transition-all active:scale-95 disabled:opacity-50">
                     {{ isUploading ? '處理中...' : '加入比較' }}
@@ -202,12 +243,13 @@
                     </button>
 
                     <!-- 卡片內容 -->
-                    <div class="flex h-32">
-                        <!-- 左側圖片 -->
-                        <div class="w-1/3 relative bg-gray-200">
+                    <div class="flex flex-col sm:flex-row sm:h-36">
+                        <!-- 左側圖片/Icon (Mobile時高度較小) -->
+                        <div class="h-32 sm:h-full sm:w-1/3 relative bg-gray-200 flex items-center justify-center">
                             <img v-if="prop.image" :src="prop.image" class="w-full h-full object-cover">
-                            <div v-else class="w-full h-full flex items-center justify-center text-gray-300">
-                                <i class="fas fa-home text-2xl"></i>
+                            <!-- 顯示選擇的 Icon -->
+                            <div v-else class="text-gray-400 flex flex-col items-center">
+                                <i :class="['fas', prop.icon || 'fa-home', 'text-4xl']"></i>
                             </div>
                             <!-- 地區標籤 -->
                             <div class="absolute bottom-0 inset-x-0 bg-black/60 p-1 text-center">
@@ -216,14 +258,14 @@
                         </div>
 
                         <!-- 右側資訊 -->
-                        <div class="w-2/3 p-3 flex flex-col justify-between">
+                        <div class="p-3 flex-1 flex flex-col justify-between">
                             <div>
-                                <h3 class="font-bold text-gray-800 leading-tight truncate">{{ prop.name }}</h3>
+                                <h3 class="font-bold text-gray-800 leading-tight truncate text-lg">{{ prop.name }}</h3>
                                 <div class="flex items-baseline gap-1 mt-1">
                                     <span class="text-xl font-bold text-slate-700">${{ prop.price }}</span>
                                     <span class="text-xs text-gray-500">萬 / {{ prop.area }}呎</span>
                                 </div>
-                                <div class="flex items-center gap-2 mt-1">
+                                <div class="flex items-center gap-2 mt-1 mb-2">
                                     <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">
                                         @{{ formatNumber(prop.sqftPrice) }}
                                     </span>
@@ -233,6 +275,10 @@
                                         {{ prop.marketDiff < 0 ? '低水' : '高水' }} {{ Math.abs(prop.marketDiff) }}%
                                     </span>
                                 </div>
+                                <!-- 顯示評論 -->
+                                <p v-if="prop.comment" class="text-xs text-gray-500 italic bg-gray-50 p-2 rounded border border-gray-100 mb-2">
+                                    <i class="fas fa-quote-left text-gray-300 mr-1"></i>{{ prop.comment }}
+                                </p>
                             </div>
                             
                             <div class="flex justify-between items-end border-t border-gray-100 pt-2">
@@ -324,6 +370,16 @@
             const marketRefPrice = ref(null);
             const selectedRegion = ref('');
 
+            // Icon 選項
+            const iconOptions = [
+                { class: 'fa-building', label: '洋樓' },
+                { class: 'fa-home', label: '村屋' },
+                { class: 'fa-city', label: '屋苑' },
+                { class: 'fa-tree', label: '清幽' },
+                { class: 'fa-water', label: '海景' },
+                { class: 'fa-subway', label: '鐵路' }
+            ];
+
             const form = ref({
                 district: '',
                 name: '',
@@ -331,7 +387,9 @@
                 area: null,
                 viewScore: 3,
                 hasRenovation: false,
-                image: null
+                image: null,
+                comment: '', // 新增備註
+                icon: 'fa-building' // 預設 Icon
             });
 
             // 當切換大區時，重置小區
@@ -479,7 +537,18 @@
                     saveToLocal();
                 }
 
-                form.value = { district: '', name: '', price: null, area: null, viewScore: 3, hasRenovation: false, image: null };
+                // Reset form but keep last used district for convenience maybe? No, clear for fresh entry.
+                form.value = { 
+                    district: '', 
+                    name: '', 
+                    price: null, 
+                    area: null, 
+                    viewScore: 3, 
+                    hasRenovation: false, 
+                    image: null, 
+                    comment: '', 
+                    icon: 'fa-building' 
+                };
                 selectedRegion.value = ''; // 重置區域選擇
                 marketRefPrice.value = null;
             };
@@ -553,6 +622,7 @@
             return {
                 form, properties, sortedProperties, isOnline, showSettings, firebaseConfigInput, isUploading,
                 districtData, marketRefPrice, calculatedSqftPrice, priceRatio, selectedRegion, handleRegionChange,
+                iconOptions, // 新增
                 addProperty, removeProperty, clearAll, handleImageUpload, updateMarketRef, 
                 formatNumber, saveConfig, resetToLocal, getScoreColor
             };
