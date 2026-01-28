@@ -69,23 +69,35 @@
             
             <form @submit.prevent="addProperty" class="space-y-4">
                 
-                <!-- 地區選擇 (新增功能) -->
-                <div>
-                    <label class="block text-xs font-medium text-gray-500 mb-1">地區 (用於比較市場價格)</label>
-                    <select v-model="form.district" @change="updateMarketRef" class="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 text-sm appearance-none">
-                        <option value="" disabled>請選擇地區</option>
-                        <optgroup v-for="(areas, region) in districtData" :label="region" :key="region">
-                            <option v-for="(price, area) in areas" :value="area">
-                                {{ area }} (參考呎價 ~${{ price }})
+                <!-- 地區選擇 (改為兩步：先選大區，再選小區) -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">區域</label>
+                        <select v-model="selectedRegion" @change="handleRegionChange" class="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 text-sm appearance-none">
+                            <option value="" disabled>請選擇</option>
+                            <option v-for="(areas, region) in districtData" :key="region" :value="region">
+                                {{ region }}
                             </option>
-                        </optgroup>
-                    </select>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">地區</label>
+                        <select v-model="form.district" @change="updateMarketRef" :disabled="!selectedRegion" class="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 text-sm appearance-none disabled:bg-gray-100 disabled:text-gray-400">
+                            <option value="" disabled>請選擇</option>
+                            <template v-if="selectedRegion">
+                                <option v-for="(price, area) in districtData[selectedRegion]" :value="area">
+                                    {{ area }} (~${{ price }})
+                                </option>
+                            </template>
+                            <option v-else value="" disabled>先選區域</option>
+                        </select>
+                    </div>
                 </div>
 
                 <!-- 名稱 -->
                 <div>
                     <label class="block text-xs font-medium text-gray-500 mb-1">屋苑 / 大廈名稱</label>
-                    <input v-model="form.name" required type="text" placeholder="例如：美孚新邨" 
+                    <input v-model="form.name" required type="text" placeholder="例如：新港城 / 海柏花園" 
                         class="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
 
@@ -250,19 +262,51 @@
 <script>
     const { createApp, ref, computed, onMounted } = Vue;
 
-    // 2025/2026 模擬市場數據 (二手居屋/私樓 自由市場參考實用呎價)
+    // 2025/2026 模擬市場數據 (更加細分)
     const HK_DISTRICT_DATA = {
-        '港島': {
-            '中西區': 16500, '灣仔': 16000, '東區': 12500, '南區': 13500
+        '港島區': {
+            '中西區 (中環/西環)': 16500,
+            '西半山/薄扶林': 17500,
+            '灣仔/銅鑼灣': 16000,
+            '跑馬地/大坑': 16500,
+            '北角/炮台山': 14500,
+            '鰂魚涌/太古': 15000,
+            '筲箕灣/柴灣': 12500,
+            '香港仔/鴨脷洲': 13000
         },
-        '九龍': {
-            '油尖旺': 13000, '深水埗': 11000, '九龍城': 14000, '黃大仙': 10500, '觀塘': 11500
+        '九龍區': {
+            '尖沙咀/佐敦': 14000,
+            '旺角/油麻地': 13000,
+            '奧運/大角咀': 14500,
+            '長沙灣/荔枝角': 13500,
+            '深水埗/南昌': 12000,
+            '紅磡/黃埔': 14000,
+            '啟德/九龍城': 16000,
+            '何文田': 15000,
+            '黃大仙/鑽石山': 12500,
+            '九龍灣/牛頭角': 12000,
+            '觀塘/藍田': 12500,
+            '油塘': 13000
         },
         '新界東': {
-            '沙田': 10500, '大埔': 9500, '北區': 9000, '西貢(將軍澳)': 12000
+            '大圍': 13000,
+            '沙田': 12500,
+            '火炭': 12000,
+            '馬鞍山': 11500, // 新增
+            '大埔': 10500,
+            '粉嶺/上水': 9500,
+            '將軍澳': 13000,
+            '西貢': 11000
         },
         '新界西': {
-            '葵青': 9500, '荃灣': 11000, '屯門': 8500, '元朗': 9500, '離島': 8000
+            '荃灣': 13000,
+            '荃灣西/深井': 12500,
+            '葵涌': 10000,
+            '青衣': 11500,
+            '屯門': 9500,
+            '元朗': 10500,
+            '天水圍': 8500,
+            '東涌': 10000
         }
     };
 
@@ -278,6 +322,7 @@
             // 地區數據
             const districtData = HK_DISTRICT_DATA;
             const marketRefPrice = ref(null);
+            const selectedRegion = ref('');
 
             const form = ref({
                 district: '',
@@ -289,14 +334,18 @@
                 image: null
             });
 
+            // 當切換大區時，重置小區
+            const handleRegionChange = () => {
+                form.value.district = '';
+                marketRefPrice.value = null;
+            };
+
             // 當選擇地區改變時，更新參考價
             const updateMarketRef = () => {
-                if (!form.value.district) return;
-                for (const region in districtData) {
-                    if (districtData[region][form.value.district]) {
-                        marketRefPrice.value = districtData[region][form.value.district];
-                        break;
-                    }
+                if (!form.value.district || !selectedRegion.value) return;
+                // 直接從選定的區域獲取價格
+                if (districtData[selectedRegion.value] && districtData[selectedRegion.value][form.value.district]) {
+                    marketRefPrice.value = districtData[selectedRegion.value][form.value.district];
                 }
             };
 
@@ -398,12 +447,18 @@
 
                 const sqft = Math.round((form.value.price * 10000) / form.value.area);
                 
-                // 查找該區參考價，如果沒有選區則用自己的價格當參考(不加不減分)
-                let refPrice = sqft; 
-                for (const region in districtData) {
-                    if (districtData[region][form.value.district]) {
-                        refPrice = districtData[region][form.value.district];
-                        break;
+                // 查找該區參考價
+                let refPrice = sqft;
+                // 如果已選區域和地區，直接獲取
+                if (selectedRegion.value && districtData[selectedRegion.value] && districtData[selectedRegion.value][form.value.district]) {
+                     refPrice = districtData[selectedRegion.value][form.value.district];
+                } else {
+                    // 保險起見的備用查找
+                    for (const region in districtData) {
+                        if (districtData[region][form.value.district]) {
+                            refPrice = districtData[region][form.value.district];
+                            break;
+                        }
                     }
                 }
 
@@ -425,6 +480,7 @@
                 }
 
                 form.value = { district: '', name: '', price: null, area: null, viewScore: 3, hasRenovation: false, image: null };
+                selectedRegion.value = ''; // 重置區域選擇
                 marketRefPrice.value = null;
             };
 
@@ -496,7 +552,7 @@
 
             return {
                 form, properties, sortedProperties, isOnline, showSettings, firebaseConfigInput, isUploading,
-                districtData, marketRefPrice, calculatedSqftPrice, priceRatio,
+                districtData, marketRefPrice, calculatedSqftPrice, priceRatio, selectedRegion, handleRegionChange,
                 addProperty, removeProperty, clearAll, handleImageUpload, updateMarketRef, 
                 formatNumber, saveConfig, resetToLocal, getScoreColor
             };
